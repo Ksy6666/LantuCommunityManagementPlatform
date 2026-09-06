@@ -1,9 +1,5 @@
-# Open_Lantu 官网
-
-> 一个完整的社团官网项目，包含前端展示、用户系统、签到积分系统、排行榜与管理后台。
->
-> **组织 Gitee：** [https://gitee.com/open_lanTuDream](https://gitee.com/open_lanTuDream)
-
+# Open_Lantu 官网（团队制作小型毕设）
+覆盖范围（springboot+vue3+typescript+mybatis+Redis）
 ---
 
 ## 项目结构

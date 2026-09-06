@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.lantu_web_java.mapper.CheckInMapper">
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO check_ins (user_id, check_in_date, points, created_at)
+        VALUES (#{userId}, #{checkInDate}, #{points}, NOW())
+    </insert>
+
+    <select id="selectByUserIdAndDate" resultType="CheckIn">
+        SELECT * FROM check_ins
+        WHERE user_id = #{userId} AND check_in_date = #{date}
+        LIMIT 1
+    </select>
+
+    <select id="selectByUserIdAndMonth" resultType="CheckIn">
+        SELECT * FROM check_ins
+        WHERE user_id = #{userId}
+          AND DATE_FORMAT(check_in_date, '%Y-%m') = #{yearMonth}
+        ORDER BY check_in_date ASC
+    </select>
+
+    <select id="selectRecentByUserId" resultType="CheckIn">
+        SELECT * FROM check_ins
+        WHERE user_id = #{userId}
+        ORDER BY check_in_date DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectTotalPoints" resultType="int">
+        SELECT COALESCE(SUM(points), 0) FROM check_ins WHERE user_id = #{userId}
+    </select>
+
+    <select id="selectAllUserTotalPoints" resultType="map">
+        SELECT c.user_id AS userId, COALESCE(SUM(c.points), 0) AS totalPoints
+        FROM check_ins c
+        INNER JOIN users u ON c.user_id = u.id
+        GROUP BY c.user_id
+        ORDER BY totalPoints DESC
+    </select>
+
+    <!-- 管理后台仪表盘 -->
+
+    <select id="countTodayCheckIns" resultType="int">
+        SELECT COUNT(*) FROM check_ins WHERE check_in_date = CURDATE()
+    </select>
+
+    <select id="countThisMonthCheckIns" resultType="int">
+        SELECT COUNT(*) FROM check_ins WHERE DATE_FORMAT(check_in_date, '%Y-%m') = #{yearMonth}
+    </select>
+
+</mapper>

@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.lantu_web_java.mapper.UserMapper">
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO users (account, password, name, nickname, phone, email, birthday, created_at, updated_at)
+        VALUES (#{account}, #{password}, #{name}, #{nickname}, #{phone}, #{email}, #{birthday}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <select id="selectById" resultType="User">
+        SELECT u.* FROM users u WHERE u.id = #{id}
+    </select>
+
+    <select id="selectByAccount" resultType="User">
+        SELECT u.* FROM users u WHERE u.account = #{account} LIMIT 1
+    </select>
+
+    <select id="selectByPhone" resultType="User">
+        SELECT u.* FROM users u WHERE u.phone = #{phone} LIMIT 1
+    </select>
+
+    <select id="selectByEmail" resultType="User">
+        SELECT u.* FROM users u WHERE u.email = #{email} LIMIT 1
+    </select>
+
+    <select id="countByAccount" resultType="int">
+        SELECT COUNT(*) FROM users WHERE account = #{account}
+    </select>
+
+    <select id="countByPhone" resultType="int">
+        SELECT COUNT(*) FROM users WHERE phone = #{phone}
+    </select>
+
+    <select id="countByEmail" resultType="int">
+        SELECT COUNT(*) FROM users WHERE email = #{email}
+    </select>
+
+    <select id="countByNickname" resultType="int">
+        SELECT COUNT(*) FROM users WHERE nickname = #{nickname}
+    </select>
+
+    <select id="selectByPhoneOrAccount" resultType="User">
+        SELECT u.* FROM users u
+        WHERE u.account = #{loginId} OR u.phone = #{loginId}
+        ORDER BY CASE WHEN u.account = #{loginId} THEN 0 ELSE 1 END
+        LIMIT 1
+    </select>
+
+    <update id="updateBirthday">
+        UPDATE users SET birthday = #{birthday}, updated_at = NOW() WHERE id = #{id}
+    </update>
+
+    <update id="updatePassword">
+        UPDATE users SET password = #{password}, updated_at = NOW() WHERE id = #{id}
+    </update>
+
+    <update id="updateProfile">
+        UPDATE users
+        <set>
+            <if test="name != null">name = #{name},</if>
+            <if test="nickname != null">nickname = #{nickname},</if>
+            <if test="phone != null">phone = #{phone},</if>
+            <if test="email != null">email = #{email},</if>
+            <if test="birthday != null">birthday = #{birthday},</if>
+            updated_at = NOW()
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectByIds" resultType="User">
+        SELECT u.* FROM users u
+        WHERE u.id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <!-- 管理后台 -->
+
+    <select id="selectAllUsers" resultType="User">
+        SELECT u.* FROM users u
+        <where>
+            <if test="keyword != null and keyword != ''">
+                u.account LIKE CONCAT('%', #{keyword}, '%')
+                OR u.nickname LIKE CONCAT('%', #{keyword}, '%')
+                OR u.name LIKE CONCAT('%', #{keyword}, '%')
+                OR u.phone LIKE CONCAT('%', #{keyword}, '%')
+            </if>
+        </where>
+        ORDER BY u.id DESC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countAllUsers" resultType="int">
+        SELECT COUNT(*) FROM users u
+        <where>
+            <if test="keyword != null and keyword != ''">
+                u.account LIKE CONCAT('%', #{keyword}, '%')
+                OR u.nickname LIKE CONCAT('%', #{keyword}, '%')
+                OR u.name LIKE CONCAT('%', #{keyword}, '%')
+                OR u.phone LIKE CONCAT('%', #{keyword}, '%')
+            </if>
+        </where>
+    </select>
+
+    <select id="countTotalUsers" resultType="int">
+        SELECT COUNT(*) FROM users
+    </select>
+
+    <update id="updateRole">
+        UPDATE users SET role_id = #{roleId}, updated_at = NOW() WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM users WHERE id = #{id}
+    </delete>
+
+</mapper>

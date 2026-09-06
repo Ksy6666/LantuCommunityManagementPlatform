@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.lantu_web_java.mapper.UserAvatarMapper">
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO user_avatars (user_id, file_path, created_at)
+        VALUES (#{userId}, #{filePath}, #{createdAt})
+    </insert>
+
+    <select id="selectByUserId" resultType="UserAvatar">
+        SELECT * FROM user_avatars WHERE user_id = #{userId} LIMIT 1
+    </select>
+
+    <delete id="deleteByUserId">
+        DELETE FROM user_avatars WHERE user_id = #{userId}
+    </delete>
+
+    <select id="selectByUserIds" resultType="UserAvatar">
+        SELECT * FROM user_avatars WHERE user_id IN
+        <foreach collection="userIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+</mapper>

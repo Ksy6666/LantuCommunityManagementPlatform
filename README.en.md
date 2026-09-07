@@ -92,6 +92,13 @@ Open_Lantu/
 │       └── util/
 │           └── JwtUtil.java            # JWT generation & validation
 │
+├── LantuAppMg/                    # Mobile admin app (HarmonyOS + ArkTS)
+│   ├── AppScope/                  # App-level config (bundleName, icon, version)
+│   ├── entry/                     # Main module (src/main/ets + resources)
+│   ├── build-profile.json5        # Build config
+│   ├── oh-package.json5           # Dependency config
+│   └── hvigor/                    # Build toolchain
+│
 ├── db/                             # Database SQL schema files
 │   ├── users.sql                   # Users table
 │   ├── user_avatars.sql            # Avatars table
@@ -135,6 +142,7 @@ Open_Lantu/
 | Redis | Leaderboard caching (optional, auto-falls back to MySQL) |
 | JWT (jjwt 0.12) | Authentication tokens |
 | BCrypt | Password hashing |
+| Lombok | Annotation-based boilerplate reduction for Java DTOs/entities |
 | Maven | Build management |
 
 ---

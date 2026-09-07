@@ -33,33 +33,41 @@
 
 ```
 LantuAppMg/
+├── AppScope/                           # 应用级配置（bundleName、图标、版本）
+│   └── resources/base/media/           # 应用图标资源
 ├── entry/                              # 主模块
-│   └── src/main/
-│       ├── ets/                        # ArkTS源码
-│       │   ├── common/                 # 公共模块
-│       │   │   ├── constants/          # 常量定义
-│       │   │   │   └── Constants.ets   # 常量、角色枚举
-│       │   │   ├── utils/              # 工具类
-│       │   │   │   ├── HttpUtil.ets    # HTTP请求封装
-│       │   │   │   └── PreferencesUtil.ets  # 本地存储工具
-│       │   │   └── api/                # API接口
-│       │   │       └── Api.ets         # 所有API接口定义
-│       │   ├── model/                  # 数据模型
-│       │   │   ├── User.ets            # 用户相关模型
-│       │   │   ├── Dashboard.ets       # 仪表盘数据模型
-│       │   │   └── ApiResponse.ets     # API响应模型
-│       │   ├── pages/                  # 页面组件
-│       │   │   ├── Index.ets           # 启动页（登录检查）
-│       │   │   ├── LoginPage.ets       # 登录页面
-│       │   │   ├── MainPage.ets        # 主页面（Tab导航）
-│       │   │   ├── DashboardPage.ets   # 仪表盘页面
-│       │   │   └── UserManagePage.ets  # 用户管理页面
-│       │   └── entryability/           # 应用入口
-│       │       └── EntryAbility.ets    # Ability生命周期
-│       └── resources/                  # 资源文件
-│           └── base/profile/
-│               └── main_pages.json     # 路由配置
+│   ├── src/main/ets/
+│   │   ├── common/                     # 公共模块
+│   │   │   ├── constants/              # 常量定义
+│   │   │   │   └── Constants.ets       # 常量、角色枚举（BASE_URL/角色）
+│   │   │   ├── utils/                  # 工具类
+│   │   │   │   ├── HttpUtil.ets        # HTTP请求封装
+│   │   │   │   └── PreferencesUtil.ets # 本地存储工具
+│   │   │   └── api/                    # API接口
+│   │   │       └── Api.ets             # 所有API接口定义
+│   │   ├── model/                      # 数据模型
+│   │   │   ├── User.ets                # 用户相关模型
+│   │   │   ├── Dashboard.ets           # 仪表盘数据模型
+│   │   │   └── ApiResponse.ets         # API响应模型
+│   │   ├── pages/                      # 页面组件
+│   │   │   ├── Index.ets               # 启动页（登录检查）
+│   │   │   ├── LoginPage.ets           # 登录页面
+│   │   │   ├── MainPage.ets            # 主页面（Tab导航）
+│   │   │   ├── DashboardPage.ets       # 仪表盘页（MainPage Tab 内容）
+│   │   │   └── UserManagePage.ets      # 用户管理页（MainPage Tab 内容）
+│   │   ├── entryability/               # 应用入口
+│   │   │   └── EntryAbility.ets        # Ability生命周期
+│   │   └── entrybackupability/         # 备份能力
+│   │       └── EntryBackupAbility.ets  # 应用备份/恢复
+│   ├── src/main/resources/             # 资源文件（element/media/profile）
+│   │   └── base/profile/               # main_pages.json / network_config.json 等
+│   ├── src/main/module.json5           # 模块配置（权限、入口、网络）
+│   ├── src/mock/mock-config.json5      # 本地 Mock 配置
+│   ├── src/ohosTest/                   # 端到端测试
+│   └── src/test/                       # 单元测试
+├── hvigor/                             # 构建脚本工具链
 ├── build-profile.json5                 # 构建配置
+├── code-linter.json5                   # 代码检查规则
 ├── oh-package.json5                    # 依赖配置
 └── README.md                           # 本文档
 ```
@@ -106,7 +114,7 @@ mvn spring-boot:run
 
 ```typescript
 export class Constants {
-  static readonly BASE_URL: string = 'http://localhost:8081/api';  // 修改为实际后端地址
+  static readonly BASE_URL: string = 'http://10.0.2.2:8081/api';  // 模拟器访问宿主机：10.0.2.2 指向宿主机 localhost
   static readonly TOKEN_KEY: string = 'auth_token';
   static readonly USER_INFO_KEY: string = 'user_info';
   static readonly TIMEOUT: number = 30000;  // 请求超时时间（毫秒）
@@ -197,7 +205,7 @@ DELETE /api/admin/users/{id}
   - Tab切换
   - 退出登录确认对话框
 
-### 4. 仪表盘页（DashboardPage.ets）
+### 4. 仪表盘页（DashboardPage.ets，MainPage Tab 内容页）
 
 - **功能**：数据统计展示
 - **展示内容**：
@@ -207,7 +215,7 @@ DELETE /api/admin/users/{id}
   - 今日签到率（环形进度条）
   - 签到统计对比（今日 vs 本月日均）
 
-### 5. 用户管理页（UserManagePage.ets）
+### 5. 用户管理页（UserManagePage.ets，MainPage Tab 内容页）
 
 - **功能**：用户信息管理
 - **特性**：
@@ -223,6 +231,8 @@ DELETE /api/admin/users/{id}
 
 ### 添加新页面
 
+> 说明：路由只需注册「独立页面」。当前 `DashboardPage`、`UserManagePage` 是 `MainPage` 通过 Tab 内嵌的内容页，不在 `main_pages.json` 中单独注册；启动页、登录页、主页面注册如下：
+
 1. 在 `entry/src/main/ets/pages/` 创建新页面文件
 2. 在 `entry/src/main/resources/base/profile/main_pages.json` 注册路由：
 
@@ -232,7 +242,7 @@ DELETE /api/admin/users/{id}
     "pages/Index",
     "pages/LoginPage",
     "pages/MainPage",
-    "pages/NewPage"  // 添加新页面
+    "pages/NewPage"  // 添加新独立页面（若为 Tab 内容页则无需注册）
   ]
 }
 ```
@@ -337,9 +347,8 @@ promptAction.showDialog({
 
 ### 5. 已知限制
 
-- `router.replaceUrl()` 已废弃，建议使用 `router.replaceUrl()` 的新API
-- `promptAction.showToast()` 已废弃，建议使用新的提示API
-- 对话框使用自定义组件实现，而非系统API
+- 部分 `@kit.ArkUI` API 在新 SDK 中标记废弃（如 `router.replaceUrl()`、`promptAction.showToast()`），项目当前仍在使用旧 API，升级 SDK 时需同步迁移到新 API
+- 对话框通过 `@State` 布尔标志控制的自定义组件实现（`DeleteDialog`/`RoleDialog`/`LogoutDialog`），而非系统 `showDialog` API
 
 ---
 

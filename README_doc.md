@@ -35,6 +35,12 @@ Open_Lantu/
 │       ├── service/        # 业务逻辑（5 个）
 │       └── util/           # 工具类
 │
+├── LantuAppMg/             # 移动端管理 App（HarmonyOS + ArkTS）
+│   ├── AppScope/           # 应用级配置（bundleName、图标、版本）
+│   ├── entry/              # 主模块（ets + resources）
+│   ├── build-profile.json5 # 构建配置
+│   └── oh-package.json5    # 依赖配置
+│
 ├── db/                     # 数据库建表 SQL（7 个）
 ├── userTX/                 # 用户头像上传目录
 └── start.bat               # Windows 一键启动脚本
@@ -132,6 +138,7 @@ npm run dev
 - MyBatis + MySQL 8（Mapper XML + 注解混合）
 - JWT 认证（jjwt 0.12，HMAC-SHA256 签名，24h 过期）
 - BCrypt 密码加密（Spring Security Crypto）
+- Lombok（注解简化实体与 DTO 样板代码）
 - Redis（排行榜 ZSET 缓存，可选依赖）
 - 统一响应格式 `ApiResponse<T>`
 

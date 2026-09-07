@@ -92,6 +92,13 @@ Open_Lantu/
 │       └── util/
 │           └── JwtUtil.java            # JWT 生成与验证
 │
+├── LantuAppMg/                    # 移动端管理 App（HarmonyOS + ArkTS）
+│   ├── AppScope/                  # 应用级配置（bundleName、图标、版本）
+│   ├── entry/                     # 主模块（src/main/ets + resources）
+│   ├── build-profile.json5        # 构建配置
+│   ├── oh-package.json5           # 依赖配置
+│   └── hvigor/                    # 构建工具链
+│
 ├── db/                             # 数据库建表 SQL
 │   ├── users.sql                   # 用户表
 │   ├── user_avatars.sql            # 头像表
@@ -135,6 +142,7 @@ Open_Lantu/
 | Redis | 排行榜缓存（可选，无 Redis 自动回退 MySQL） |
 | JWT (jjwt 0.12) | 认证令牌 |
 | BCrypt | 密码加密 |
+| Lombok | 注解简化 Java 实体/DTO 样板代码 |
 | Maven | 构建管理 |
 
 ---

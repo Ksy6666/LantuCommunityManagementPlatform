@@ -76,6 +76,8 @@ npm run preview
 
 开发服务器已配置 Vite Proxy，将 `/api` 和 `/avatars` 请求转发到 `http://localhost:8081`（后端）。
 
+> 项目还配置了 `allowedHosts`（如 `68356lmot458.vicp.fun`）以支持内网穿透访问开发服务器。
+
 ## 构建
 
 ```bash

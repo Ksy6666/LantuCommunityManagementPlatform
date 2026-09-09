@@ -295,11 +295,18 @@ function handleUserMenuSelect(key: string) {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  /* 静态渐变：以 #e3e3e3 为基底，顶部不透明 → 底部透明，毛玻璃效果 */
+  background: linear-gradient(
+    to bottom,
+    rgba(227, 227, 227, 1)    0%,
+    rgba(227, 227, 227, 0.85) 25%,
+    rgba(227, 227, 227, 0.6)  50%,
+    rgba(227, 227, 227, 0.3)  75%,
+    rgba(227, 227, 227, 0)    100%
+  );
+  backdrop-filter: blur(6px) saturate(150%);
+  -webkit-backdrop-filter: blur(6px) saturate(150%);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .header-inner {

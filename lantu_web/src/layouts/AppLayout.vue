@@ -13,6 +13,7 @@ const mobileMenuOpen = ref(false)
 const navItems: MenuOption[] = [
   { label: '首页', key: '/' },
   { label: '活动', key: '/activities' },
+  { label: '讨论', key: '/discussion' },
   { label: '项目', key: '/projects' },
   { label: '加入', key: '/join' },
   { label: '关于', key: '/about' },

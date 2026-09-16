@@ -271,4 +271,144 @@ export function deleteUserApi(userId: number) {
   })
 }
 
+/** ══════════════════════════════════════
+ *  技术讨论 API
+ *  ══════════════════════════════════════ */
+
+export interface DiscussionPost {
+  id: number
+  userId: number
+  title: string
+  content: string
+  category: string
+  tags: string | null
+  viewCount: number
+  likeCount: number
+  favoriteCount: number
+  commentCount: number
+  status: number
+  createdAt: string
+  updatedAt: string
+  authorNickname?: string
+  authorAvatar?: string | null
+}
+
+export interface DiscussionComment {
+  id: number
+  postId: number
+  userId: number
+  parentId: number
+  content: string
+  likeCount: number
+  status: number
+  createdAt: string
+  authorNickname?: string
+  authorAvatar?: string | null
+}
+
+export interface DiscussionPageData {
+  list: DiscussionPost[]
+  total: number
+  page: number
+  size: number
+}
+
+/** 发布帖子（需登录） */
+export function publishPostApi(data: {
+  title: string
+  content: string
+  category?: string
+  tags?: string
+}) {
+  const token = sessionStorage.getItem('token')
+  return api.post<ApiResponse<DiscussionPost>>('/discussion/posts', data, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+}
+
+/** 帖子列表（分页+分类+关键词） */
+export function getDiscussionPostsApi(
+  page = 1,
+  size = 10,
+  category = '',
+  keyword = '',
+) {
+  return api.get<ApiResponse<DiscussionPageData>>('/discussion/posts', {
+    params: { page, size, category, keyword },
+  })
+}
+
+/** 帖子详情（浏览量+1） */
+export function getDiscussionPostApi(id: number) {
+  return api.get<ApiResponse<DiscussionPost>>(`/discussion/posts/${id}`)
+}
+
+/** 帖子评论列表 */
+export function getDiscussionCommentsApi(postId: number) {
+  return api.get<ApiResponse<DiscussionComment[]>>(`/discussion/posts/${postId}/comments`)
+}
+
+/** 发表评论/回答（需登录） */
+export function addDiscussionCommentApi(postId: number, content: string, parentId?: number) {
+  const token = sessionStorage.getItem('token')
+  return api.post<ApiResponse<DiscussionComment>>(
+    `/discussion/posts/${postId}/comments`,
+    { content, parentId: parentId || 0 },
+    { headers: { Authorization: `Bearer ${token}` } },
+  )
+}
+
+/** 点赞/取消点赞帖子（需登录） */
+export function togglePostLikeApi(postId: number) {
+  const token = sessionStorage.getItem('token')
+  return api.post<ApiResponse<{ liked: boolean; likeCount: number }>>(
+    `/discussion/posts/${postId}/like`,
+    {},
+    { headers: { Authorization: `Bearer ${token}` } },
+  )
+}
+
+/** 点赞/取消点赞评论（需登录） */
+export function toggleCommentLikeApi(commentId: number) {
+  const token = sessionStorage.getItem('token')
+  return api.post<ApiResponse<{ likeCount: number }>>(
+    `/discussion/comments/${commentId}/like`,
+    {},
+    { headers: { Authorization: `Bearer ${token}` } },
+  )
+}
+
+/** 收藏/取消收藏帖子（需登录） */
+export function togglePostFavoriteApi(postId: number) {
+  const token = sessionStorage.getItem('token')
+  return api.post<ApiResponse<{ favorited: boolean; favoriteCount: number }>>(
+    `/discussion/posts/${postId}/favorite`,
+    {},
+    { headers: { Authorization: `Bearer ${token}` } },
+  )
+}
+
+/** 我发布的帖子（需登录） */
+export function getMyPostsApi() {
+  const token = sessionStorage.getItem('token')
+  return api.get<ApiResponse<DiscussionPost[]>>('/discussion/my/posts', {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+}
+
+/** 我收藏的帖子（需登录） */
+export function getMyFavoritesApi() {
+  const token = sessionStorage.getItem('token')
+  return api.get<ApiResponse<DiscussionPost[]>>('/discussion/my/favorites', {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+}
+
+/** 热点帖子 TopN */
+export function getHotPostsApi(limit = 10) {
+  return api.get<ApiResponse<DiscussionPost[]>>('/discussion/hot', {
+    params: { limit },
+  })
+}
+
 export default api

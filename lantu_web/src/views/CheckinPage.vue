@@ -22,7 +22,6 @@ const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8�
 // 获取当天日期
 const today = new Date()
 const todayStr = computed(() => formatDate(today))
-const todayDate = today.getDate()
 
 // 格式化日期为 YYYY-MM-DD
 function formatDate(d: Date): string {
@@ -31,17 +30,6 @@ function formatDate(d: Date): string {
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
 }
-
-// 当前年-月字符串
-const yearMonth = computed(() => {
-  return `${currentYear.value}-${String(currentMonth.value + 1).padStart(2, '0')}`
-})
-
-// 是否为当前月份
-const isCurrentMonth = computed(() => {
-  const now = new Date()
-  return currentYear.value === now.getFullYear() && currentMonth.value === now.getMonth()
-})
 
 // 已签到的日期集合
 const checkedInSet = computed(() => {

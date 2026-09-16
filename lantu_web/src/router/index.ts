@@ -21,6 +21,24 @@ const router = createRouter({
       meta: { title: '活动' },
     },
     {
+      path: '/discussion',
+      name: 'discussion',
+      component: () => import('../views/DiscussionPage.vue'),
+      meta: { title: '技术讨论' },
+    },
+    {
+      path: '/discussion/publish',
+      name: 'discussion-publish',
+      component: () => import('../views/DiscussionPublishPage.vue'),
+      meta: { title: '发布帖子', requiresAuth: true },
+    },
+    {
+      path: '/discussion/:id',
+      name: 'discussion-detail',
+      component: () => import('../views/DiscussionDetailPage.vue'),
+      meta: { title: '帖子详情' },
+    },
+    {
       path: '/projects',
       name: 'projects',
       component: () => import('../views/ProjectsPage.vue'),

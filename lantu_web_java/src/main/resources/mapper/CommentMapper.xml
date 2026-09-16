@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.lantu_web_java.mapper.CommentMapper">
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO lantu_web_dsn.comments (post_id, user_id, parent_id, content, created_at)
+        VALUES (#{postId}, #{userId}, #{parentId}, #{content}, NOW())
+    </insert>
+
+    <select id="selectByPostId" resultType="Comment">
+        SELECT c.id, c.post_id, c.user_id, c.parent_id, c.content, c.like_count, c.status, c.created_at,
+               u.nickname AS author_nickname,
+               ua.file_path AS author_avatar
+        FROM lantu_web_dsn.comments c
+        LEFT JOIN lantu_web.users u ON c.user_id = u.id
+        LEFT JOIN lantu_web.user_avatars ua ON c.user_id = ua.user_id
+        WHERE c.post_id = #{postId} AND c.status = 1
+        ORDER BY c.created_at ASC, c.id ASC
+    </select>
+
+    <update id="changeLikeCount">
+        UPDATE lantu_web_dsn.comments SET like_count = GREATEST(like_count + #{delta}, 0) WHERE id = #{id}
+    </update>
+
+    <select id="selectById" resultType="Comment">
+        SELECT * FROM lantu_web_dsn.comments WHERE id = #{id} AND status = 1
+    </select>
+
+</mapper>

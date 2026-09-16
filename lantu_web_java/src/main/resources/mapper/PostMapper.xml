@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.lantu_web_java.mapper.PostMapper">
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO lantu_web_dsn.posts (user_id, title, content, category, tags, created_at, updated_at)
+        VALUES (#{userId}, #{title}, #{content}, #{category}, #{tags}, NOW(), NOW())
+    </insert>
+
+    <sql id="postWithAuthorColumns">
+        p.id, p.user_id, p.title, p.content, p.category, p.tags,
+        p.view_count, p.like_count, p.favorite_count, p.comment_count,
+        p.status, p.created_at, p.updated_at,
+        u.nickname AS author_nickname,
+        ua.file_path AS author_avatar
+    </sql>
+
+    <select id="selectById" resultType="Post">
+        SELECT <include refid="postWithAuthorColumns"/>
+        FROM lantu_web_dsn.posts p
+        LEFT JOIN lantu_web.users u ON p.user_id = u.id
+        LEFT JOIN lantu_web.user_avatars ua ON p.user_id = ua.user_id
+        WHERE p.id = #{id} AND p.status = 1
+    </select>
+
+    <select id="selectPage" resultType="Post">
+        SELECT <include refid="postWithAuthorColumns"/>
+        FROM lantu_web_dsn.posts p
+        LEFT JOIN lantu_web.users u ON p.user_id = u.id
+        LEFT JOIN lantu_web.user_avatars ua ON p.user_id = ua.user_id
+        WHERE p.status = 1
+        <if test="category != null and category != ''">
+            AND p.category = #{category}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (p.title LIKE CONCAT('%', #{keyword}, '%') OR p.content LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        ORDER BY p.created_at DESC, p.id DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="countPosts" resultType="long">
+        SELECT COUNT(*)
+        FROM lantu_web_dsn.posts p
+        WHERE p.status = 1
+        <if test="category != null and category != ''">
+            AND p.category = #{category}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (p.title LIKE CONCAT('%', #{keyword}, '%') OR p.content LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+    </select>
+
+    <update id="incrementViewCount">
+        UPDATE lantu_web_dsn.posts SET view_count = view_count + 1 WHERE id = #{id}
+    </update>
+
+    <update id="changeLikeCount">
+        UPDATE lantu_web_dsn.posts SET like_count = GREATEST(like_count + #{delta}, 0) WHERE id = #{id}
+    </update>
+
+    <update id="changeFavoriteCount">
+        UPDATE lantu_web_dsn.posts SET favorite_count = GREATEST(favorite_count + #{delta}, 0) WHERE id = #{id}
+    </update>
+
+    <update id="changeCommentCount">
+        UPDATE lantu_web_dsn.posts SET comment_count = GREATEST(comment_count + #{delta}, 0) WHERE id = #{id}
+    </update>
+
+    <select id="countLikeByUser" resultType="int">
+        SELECT COUNT(*) FROM lantu_web_dsn.post_likes WHERE post_id = #{postId} AND user_id = #{userId}
+    </select>
+
+    <select id="countFavoriteByUser" resultType="int">
+        SELECT COUNT(*) FROM lantu_web_dsn.post_favorites WHERE post_id = #{postId} AND user_id = #{userId}
+    </select>
+
+    <select id="selectByUserId" resultType="Post">
+        SELECT <include refid="postWithAuthorColumns"/>
+        FROM lantu_web_dsn.posts p
+        LEFT JOIN lantu_web.users u ON p.user_id = u.id
+        LEFT JOIN lantu_web.user_avatars ua ON p.user_id = ua.user_id
+        WHERE p.status = 1 AND p.user_id = #{userId}
+        ORDER BY p.created_at DESC
+    </select>
+
+    <select id="selectFavoriteByUserId" resultType="Post">
+        SELECT <include refid="postWithAuthorColumns"/>
+        FROM lantu_web_dsn.post_favorites f
+        INNER JOIN lantu_web_dsn.posts p ON f.post_id = p.id
+        LEFT JOIN lantu_web.users u ON p.user_id = u.id
+        LEFT JOIN lantu_web.user_avatars ua ON p.user_id = ua.user_id
+        WHERE p.status = 1 AND f.user_id = #{userId}
+        ORDER BY f.created_at DESC
+    </select>
+
+    <select id="selectHotPosts" resultType="Post">
+        SELECT <include refid="postWithAuthorColumns"/>
+        FROM lantu_web_dsn.posts p
+        LEFT JOIN lantu_web.users u ON p.user_id = u.id
+        LEFT JOIN lantu_web.user_avatars ua ON p.user_id = ua.user_id
+        WHERE p.status = 1
+        ORDER BY (p.view_count + p.like_count * 5 + p.favorite_count * 10 + p.comment_count * 8) DESC, p.id DESC
+        LIMIT #{limit}
+    </select>
+
+</mapper>

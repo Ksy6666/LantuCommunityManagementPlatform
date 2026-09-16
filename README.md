@@ -102,7 +102,13 @@ Open_Lantu/
 │   ├── check_ins.sql               # 签到记录表
 │   ├── roles.sql                   # 角色表 + 种子数据
 │   ├── alter_users_add_role.sql    # users 表添加 role_id 字段
-│   └── migrate_nickname_unique.sql # 唯一索引迁移
+│   ├── migrate_nickname_unique.sql # 唯一索引迁移
+│   ├── create_database_lantu_web_dsn.sql  # 技术讨论库（独立库）
+│   ├── dsn_posts.sql               # 讨论帖子表
+│   ├── dsn_comments.sql            # 讨论评论/回答表
+│   ├── dsn_post_likes.sql          # 讨论点赞表
+│   ├── dsn_post_favorites.sql      # 讨论收藏表
+│   └── dsn_seed_data.sql           # 讨论演示种子数据
 │
 ├── userTX/                         # 用户头像上传存储目录
 ├── start.bat                       # Windows 快速启动脚本
@@ -178,6 +184,13 @@ Open_Lantu/
 - 加入我们页面预报名表单
 - 提交姓名、专业、年级、自我介绍
 
+### 💬 技术讨论系统（独立数据库 lantu_web_dsn）
+- 发布/提问技术内容，支持分类（技术分享/技术问答/经验交流/求助）与标签
+- 他人可回答/评论，支持对评论进行回复
+- 帖子点赞、收藏、评论数统计（同用户不可重复点赞/收藏）
+- 帖子浏览量自增、热门帖子排行榜（Redis ZSET，Redis 不可用时自动回退 MySQL）
+- 讨论数据独立存储于 `lantu_web_dsn` 库，作者昵称/头像跨库关联 `lantu_web.users`
+
 ### ⚙️ 管理后台
 - ECharts 仪表盘：总用户数、今日签到数、本月签到数、签到率图表
 - 用户管理：分页列表、关键词搜索、角色切换、删除用户
@@ -216,6 +229,18 @@ mysql -u root -p lantu_web < db/preregistrations.sql
 mysql -u root -p lantu_web < db/check_ins.sql
 mysql -u root -p lantu_web < db/roles.sql
 mysql -u root -p lantu_web < db/alter_users_add_role.sql
+```
+
+技术讨论模块使用独立数据库（`lantu_web_dsn`），按以下顺序初始化：
+
+```bash
+mysql -u root -p < db/create_database_lantu_web_dsn.sql
+mysql -u root -p lantu_web_dsn < db/dsn_posts.sql
+mysql -u root -p lantu_web_dsn < db/dsn_comments.sql
+mysql -u root -p lantu_web_dsn < db/dsn_post_likes.sql
+mysql -u root -p lantu_web_dsn < db/dsn_post_favorites.sql
+# 可选：导入中文演示种子数据
+mysql --default-character-set=utf8mb4 -u root -p lantu_web_dsn < db/dsn_seed_data.sql
 ```
 
 > 注意：`roles.sql` 和 `alter_users_add_role.sql` 也可由 `DataInitializer.java` 在应用启动时自动执行。
@@ -267,6 +292,9 @@ npm run dev
 | `/` | 首页 | Hero + 特点 + 活动 + 数据 + 动态 + 成员说 + 合作组织 | ❌ |
 | `/about` | 关于我们 | 故事 + 使命愿景 + 发展历程 + 价值观 + 成就 | ❌ |
 | `/activities` | 活动 | 活动列表（按分类筛选）+ 活动形式 + 参与方式 | ❌ |
+| `/discussion` | 技术讨论 | 帖子列表（分类筛选/搜索）+ 热门帖子排行 | ❌ |
+| `/discussion/publish` | 发布帖子 | 发布/提问技术内容 | ✅ |
+| `/discussion/:id` | 帖子详情 | 正文 + 点赞/收藏 + 回答/评论与回复 | ❌ |
 | `/projects` | 项目 | 项目展示 + 技术栈标签 + 贡献指南 | ❌ |
 | `/join` | 加入我们 | 加入理由 + 流程 + 成员心声 + 联系方式 + 预报名表单 | ❌ |
 | `/login` | 登录 | 手机号/账号 + 密码登录 | ❌ |
@@ -325,6 +353,22 @@ npm run dev
 |------|------|------|--------|
 | GET | `/api/checkin/ranking?topN=20` | 获取积分排行榜 | ❌ |
 | GET | `/api/checkin/ranking/me` | 获取当前用户排名 | ✅ |
+
+### 技术讨论（数据存于 lantu_web_dsn 库）
+
+| 方法 | 路径 | 说明 | 需认证 |
+|------|------|------|--------|
+| POST | `/api/discussion/posts` | 发布帖子 | ✅ |
+| GET | `/api/discussion/posts?page=1&size=10&category=&keyword=` | 帖子列表（分页+分类+搜索） | ❌ |
+| GET | `/api/discussion/posts/{id}` | 帖子详情（浏览量+1） | ❌ |
+| GET | `/api/discussion/posts/{id}/comments` | 帖子评论/回答列表 | ❌ |
+| POST | `/api/discussion/posts/{id}/comments` | 发表评论/回答（parentId 支持回复） | ✅ |
+| POST | `/api/discussion/posts/{id}/like` | 点赞/取消点赞帖子 | ✅ |
+| POST | `/api/discussion/comments/{id}/like` | 点赞/取消点赞评论 | ✅ |
+| POST | `/api/discussion/posts/{id}/favorite` | 收藏/取消收藏帖子 | ✅ |
+| GET | `/api/discussion/my/posts` | 我发布的帖子 | ✅ |
+| GET | `/api/discussion/my/favorites` | 我收藏的帖子 | ✅ |
+| GET | `/api/discussion/hot?limit=10` | 热门帖子 TopN（Redis+MySQL 回退） | ❌ |
 
 ### 管理后台
 

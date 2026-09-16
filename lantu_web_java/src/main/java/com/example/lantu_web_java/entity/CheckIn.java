@@ -1,9 +1,15 @@
 package com.example.lantu_web_java.entity;
 
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+@TableName("check_ins")
 public class CheckIn {
+    @TableId(type = IdType.AUTO)
     private Long id;
     private Long userId;
     private LocalDate checkInDate;

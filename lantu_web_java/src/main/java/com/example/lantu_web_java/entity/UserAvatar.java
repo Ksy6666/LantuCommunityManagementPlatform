@@ -1,9 +1,15 @@
 package com.example.lantu_web_java.entity;
 
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+
 import java.time.LocalDateTime;
 
+@TableName("user_avatars")
 public class UserAvatar {
 
+    @TableId(type = IdType.AUTO)
     private Long id;
 
     private Long userId;

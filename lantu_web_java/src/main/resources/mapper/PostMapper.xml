@@ -2,11 +2,6 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.lantu_web_java.mapper.PostMapper">
 
-    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO lantu_web_dsn.posts (user_id, title, content, category, tags, created_at, updated_at)
-        VALUES (#{userId}, #{title}, #{content}, #{category}, #{tags}, NOW(), NOW())
-    </insert>
-
     <sql id="postWithAuthorColumns">
         p.id, p.user_id, p.title, p.content, p.category, p.tags,
         p.view_count, p.like_count, p.favorite_count, p.comment_count,
@@ -15,7 +10,7 @@
         ua.file_path AS author_avatar
     </sql>
 
-    <select id="selectById" resultType="Post">
+    <select id="findPostById" resultType="Post">
         SELECT <include refid="postWithAuthorColumns"/>
         FROM lantu_web_dsn.posts p
         LEFT JOIN lantu_web.users u ON p.user_id = u.id
@@ -49,30 +44,6 @@
         <if test="keyword != null and keyword != ''">
             AND (p.title LIKE CONCAT('%', #{keyword}, '%') OR p.content LIKE CONCAT('%', #{keyword}, '%'))
         </if>
-    </select>
-
-    <update id="incrementViewCount">
-        UPDATE lantu_web_dsn.posts SET view_count = view_count + 1 WHERE id = #{id}
-    </update>
-
-    <update id="changeLikeCount">
-        UPDATE lantu_web_dsn.posts SET like_count = GREATEST(like_count + #{delta}, 0) WHERE id = #{id}
-    </update>
-
-    <update id="changeFavoriteCount">
-        UPDATE lantu_web_dsn.posts SET favorite_count = GREATEST(favorite_count + #{delta}, 0) WHERE id = #{id}
-    </update>
-
-    <update id="changeCommentCount">
-        UPDATE lantu_web_dsn.posts SET comment_count = GREATEST(comment_count + #{delta}, 0) WHERE id = #{id}
-    </update>
-
-    <select id="countLikeByUser" resultType="int">
-        SELECT COUNT(*) FROM lantu_web_dsn.post_likes WHERE post_id = #{postId} AND user_id = #{userId}
-    </select>
-
-    <select id="countFavoriteByUser" resultType="int">
-        SELECT COUNT(*) FROM lantu_web_dsn.post_favorites WHERE post_id = #{postId} AND user_id = #{userId}
     </select>
 
     <select id="selectByUserId" resultType="Post">

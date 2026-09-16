@@ -1,5 +1,6 @@
 package com.example.lantu_web_java.service;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.example.lantu_web_java.entity.User;
 import com.example.lantu_web_java.entity.UserAvatar;
 import com.example.lantu_web_java.mapper.UserAvatarMapper;
@@ -86,7 +87,7 @@ public class AvatarService {
         }
 
         // 删除旧头像记录
-        avatarMapper.deleteByUserId(userId);
+        avatarMapper.delete(Wrappers.<UserAvatar>lambdaQuery().eq(UserAvatar::getUserId, userId));
 
         // 创建新头像记录
         String relativePath = "/avatars/" + fileName;
@@ -101,7 +102,9 @@ public class AvatarService {
      * 获取用户头像路径
      */
     public Optional<String> getAvatarPath(Long userId) {
-        return Optional.ofNullable(avatarMapper.selectByUserId(userId))
+        return Optional.ofNullable(avatarMapper.selectOne(Wrappers.<UserAvatar>lambdaQuery()
+                        .eq(UserAvatar::getUserId, userId)
+                        .last("LIMIT 1")))
                 .map(UserAvatar::getFilePath);
     }
 }

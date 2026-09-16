@@ -1,12 +1,19 @@
 package com.example.lantu_web_java.entity;
 
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+
 import java.time.LocalDateTime;
 
 /**
  * 技术讨论帖子（库：lantu_web_dsn.posts）
  */
+@TableName("lantu_web_dsn.posts")
 public class Post {
 
+    @TableId(type = IdType.AUTO)
     private Long id;
 
     private Long userId;
@@ -34,9 +41,11 @@ public class Post {
     private LocalDateTime updatedAt;
 
     /** 作者昵称（关联 lantu_web.users，非表字段） */
+    @TableField(exist = false)
     private String authorNickname;
 
     /** 作者头像路径（关联 lantu_web.user_avatars，非表字段） */
+    @TableField(exist = false)
     private String authorAvatar;
 
     public Post() {}

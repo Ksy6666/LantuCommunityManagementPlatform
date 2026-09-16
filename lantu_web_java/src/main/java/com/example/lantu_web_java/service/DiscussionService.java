@@ -1,5 +1,6 @@
 package com.example.lantu_web_java.service;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.example.lantu_web_java.entity.Comment;
 import com.example.lantu_web_java.entity.Post;
 import com.example.lantu_web_java.entity.PostFavorite;
@@ -15,6 +16,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.*;
 
 /**
@@ -77,8 +79,12 @@ public class DiscussionService {
         }
 
         Post post = new Post(userId, title.trim(), content.trim(), finalCategory, tags);
+        // 原 XML insert 由 NOW() 写入 created_at/updated_at，改用继承 insert 前在 Java 侧设置
+        LocalDateTime now = LocalDateTime.now();
+        post.setCreatedAt(now);
+        post.setUpdatedAt(now);
         postMapper.insert(post);
-        return postMapper.selectById(post.getId());
+        return postMapper.findPostById(post.getId());
     }
 
     /**
@@ -107,11 +113,13 @@ public class DiscussionService {
      * 查询帖子详情（浏览量 +1）
      */
     public Post getPostDetail(Long postId) {
-        Post post = postMapper.selectById(postId);
+        Post post = postMapper.findPostById(postId);
         if (post == null) {
             throw new RuntimeException("帖子不存在或已删除");
         }
-        postMapper.incrementViewCount(postId);
+        postMapper.update(null, Wrappers.<Post>lambdaUpdate()
+                .setSql("view_count = view_count + 1")
+                .eq(Post::getId, postId));
         post.setViewCount((post.getViewCount() == null ? 0 : post.getViewCount()) + 1);
         return post;
     }
@@ -140,21 +148,25 @@ public class DiscussionService {
         if (content == null || content.isBlank()) {
             throw new RuntimeException("评论内容不能为空");
         }
-        Post post = postMapper.selectById(postId);
+        Post post = postMapper.findPostById(postId);
         if (post == null) {
             throw new RuntimeException("帖子不存在或已删除");
         }
         Long finalParentId = (parentId == null || parentId <= 0) ? 0L : parentId;
         if (finalParentId > 0) {
-            Comment parent = commentMapper.selectById(finalParentId);
+            Comment parent = commentMapper.findCommentById(finalParentId);
             if (parent == null || !parent.getPostId().equals(postId)) {
                 throw new RuntimeException("回复的评论不存在");
             }
         }
 
         Comment comment = new Comment(postId, userId, finalParentId, content.trim());
+        // 原 XML insert 由 NOW() 写入 created_at，改用继承 insert 前在 Java 侧设置
+        comment.setCreatedAt(LocalDateTime.now());
         commentMapper.insert(comment);
-        postMapper.changeCommentCount(postId, 1);
+        postMapper.update(null, Wrappers.<Post>lambdaUpdate()
+                .setSql("comment_count = GREATEST(comment_count + {0}, 0)", 1)
+                .eq(Post::getId, postId));
 
         // 有新评论时更新 Redis 热帖得分
         try {
@@ -179,22 +191,31 @@ public class DiscussionService {
      */
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> toggleLike(Long userId, Long postId) {
-        Post post = postMapper.selectById(postId);
+        Post post = postMapper.findPostById(postId);
         if (post == null) {
             throw new RuntimeException("帖子不存在或已删除");
         }
         boolean liked;
         int delta;
-        if (postLikeMapper.countByPostAndUser(postId, userId) > 0) {
-            postLikeMapper.deleteByPostAndUser(postId, userId);
+        if (postLikeMapper.selectCount(Wrappers.<PostLike>lambdaQuery()
+                .eq(PostLike::getPostId, postId)
+                .eq(PostLike::getUserId, userId)) > 0) {
+            postLikeMapper.delete(Wrappers.<PostLike>lambdaQuery()
+                    .eq(PostLike::getPostId, postId)
+                    .eq(PostLike::getUserId, userId));
             liked = false;
             delta = -1;
         } else {
-            postLikeMapper.insert(new PostLike(postId, userId));
+            PostLike like = new PostLike(postId, userId);
+            // 原 XML insert 由 NOW() 写入 created_at，改用继承 insert 前在 Java 侧设置
+            like.setCreatedAt(LocalDateTime.now());
+            postLikeMapper.insert(like);
             liked = true;
             delta = 1;
         }
-        postMapper.changeLikeCount(postId, delta);
+        postMapper.update(null, Wrappers.<Post>lambdaUpdate()
+                .setSql("like_count = GREATEST(like_count + {0}, 0)", delta)
+                .eq(Post::getId, postId));
 
         try {
             refreshRedisHotScore(postId);
@@ -213,14 +234,16 @@ public class DiscussionService {
      */
     @Transactional(rollbackFor = Exception.class)
     public int toggleCommentLike(Long userId, Long commentId) {
-        Comment comment = commentMapper.selectById(commentId);
+        Comment comment = commentMapper.findCommentById(commentId);
         if (comment == null) {
             throw new RuntimeException("评论不存在或已删除");
         }
         // 简化处理：同一用户对评论的点赞通过 like_count 增减模拟（不建独立表）
         int delta = comment.getLikeCount() != null && comment.getLikeCount() > 0 ? -1 : 1;
-        commentMapper.changeLikeCount(commentId, delta);
-        Comment updated = commentMapper.selectById(commentId);
+        commentMapper.update(null, Wrappers.<Comment>lambdaUpdate()
+                .setSql("like_count = GREATEST(like_count + {0}, 0)", delta)
+                .eq(Comment::getId, commentId));
+        Comment updated = commentMapper.findCommentById(commentId);
         return updated != null && updated.getLikeCount() != null ? updated.getLikeCount() : 0;
     }
 
@@ -231,22 +254,31 @@ public class DiscussionService {
      */
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> toggleFavorite(Long userId, Long postId) {
-        Post post = postMapper.selectById(postId);
+        Post post = postMapper.findPostById(postId);
         if (post == null) {
             throw new RuntimeException("帖子不存在或已删除");
         }
         boolean favorited;
         int delta;
-        if (postFavoriteMapper.countByPostAndUser(postId, userId) > 0) {
-            postFavoriteMapper.deleteByPostAndUser(postId, userId);
+        if (postFavoriteMapper.selectCount(Wrappers.<PostFavorite>lambdaQuery()
+                .eq(PostFavorite::getPostId, postId)
+                .eq(PostFavorite::getUserId, userId)) > 0) {
+            postFavoriteMapper.delete(Wrappers.<PostFavorite>lambdaQuery()
+                    .eq(PostFavorite::getPostId, postId)
+                    .eq(PostFavorite::getUserId, userId));
             favorited = false;
             delta = -1;
         } else {
-            postFavoriteMapper.insert(new PostFavorite(postId, userId));
+            PostFavorite favorite = new PostFavorite(postId, userId);
+            // 原 XML insert 由 NOW() 写入 created_at，改用继承 insert 前在 Java 侧设置
+            favorite.setCreatedAt(LocalDateTime.now());
+            postFavoriteMapper.insert(favorite);
             favorited = true;
             delta = 1;
         }
-        postMapper.changeFavoriteCount(postId, delta);
+        postMapper.update(null, Wrappers.<Post>lambdaUpdate()
+                .setSql("favorite_count = GREATEST(favorite_count + {0}, 0)", delta)
+                .eq(Post::getId, postId));
 
         Map<String, Object> result = new HashMap<>();
         result.put("favorited", favorited);
@@ -261,19 +293,25 @@ public class DiscussionService {
         Map<Long, Boolean> map = new HashMap<>();
         if (userId == null || posts == null) return map;
         for (Post p : posts) {
-            map.put(p.getId(), postLikeMapper.countByPostAndUser(p.getId(), userId) > 0);
+            map.put(p.getId(), postLikeMapper.selectCount(Wrappers.<PostLike>lambdaQuery()
+                    .eq(PostLike::getPostId, p.getId())
+                    .eq(PostLike::getUserId, userId)) > 0);
         }
         return map;
     }
 
     public boolean isPostLiked(Long userId, Long postId) {
         if (userId == null) return false;
-        return postLikeMapper.countByPostAndUser(postId, userId) > 0;
+        return postLikeMapper.selectCount(Wrappers.<PostLike>lambdaQuery()
+                .eq(PostLike::getPostId, postId)
+                .eq(PostLike::getUserId, userId)) > 0;
     }
 
     public boolean isPostFavorited(Long userId, Long postId) {
         if (userId == null) return false;
-        return postFavoriteMapper.countByPostAndUser(postId, userId) > 0;
+        return postFavoriteMapper.selectCount(Wrappers.<PostFavorite>lambdaQuery()
+                .eq(PostFavorite::getPostId, postId)
+                .eq(PostFavorite::getUserId, userId)) > 0;
     }
 
     // ==================== 热点帖子（Redis + MySQL 回退） ====================
@@ -291,7 +329,7 @@ public class DiscussionService {
                 if (members != null && !members.isEmpty()) {
                     List<Post> result = new ArrayList<>();
                     for (String member : members) {
-                        Post post = postMapper.selectById(Long.valueOf(member));
+                        Post post = postMapper.findPostById(Long.valueOf(member));
                         if (post != null) {
                             result.add(post);
                         }
@@ -313,7 +351,7 @@ public class DiscussionService {
     private void refreshRedisHotScore(Long postId) {
         StringRedisTemplate redis = getRedis();
         if (redis == null) return;
-        Post post = postMapper.selectById(postId);
+        Post post = postMapper.findPostById(postId);
         if (post == null) return;
         double score = (post.getViewCount() == null ? 0 : post.getViewCount())
                 + (post.getLikeCount() == null ? 0 : post.getLikeCount()) * 5

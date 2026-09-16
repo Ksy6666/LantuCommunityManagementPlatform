@@ -1,5 +1,8 @@
 package com.example.lantu_web_java.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.example.lantu_web_java.entity.CheckIn;
 import com.example.lantu_web_java.entity.User;
 import com.example.lantu_web_java.entity.UserAvatar;
 import com.example.lantu_web_java.mapper.CheckInMapper;
@@ -67,7 +70,7 @@ public class RankingService {
         }
 
         try {
-            List<Map<String, Object>> allPoints = checkInMapper.selectAllUserTotalPoints();
+            List<Map<String, Object>> allPoints = selectAllUserTotalPoints();
             if (allPoints.isEmpty()) {
                 log.info("数据库无签到记录，跳过 Redis 排行榜初始化");
                 return;
@@ -84,10 +87,37 @@ public class RankingService {
     }
 
     /**
+     * 等价旧 SQL：SELECT c.user_id AS userId, COALESCE(SUM(c.points), 0) AS totalPoints
+     * FROM check_ins c INNER JOIN users u ON c.user_id = u.id
+     * GROUP BY c.user_id ORDER BY totalPoints DESC
+     * （INNER JOIN users 由 inSql 子查询等价表达）
+     */
+    private List<Map<String, Object>> selectAllUserTotalPoints() {
+        return checkInMapper.selectMaps(new QueryWrapper<CheckIn>()
+                .select("user_id AS userId", "COALESCE(SUM(points), 0) AS totalPoints")
+                .inSql("user_id", "SELECT id FROM users")
+                .groupBy("user_id")
+                .orderByDesc("totalPoints"));
+    }
+
+    /**
+     * 等价旧 SQL：SELECT COALESCE(SUM(points), 0) FROM check_ins WHERE user_id = ?
+     */
+    private Integer selectTotalPoints(Long userId) {
+        List<Object> objs = checkInMapper.selectObjs(new QueryWrapper<CheckIn>()
+                .select("COALESCE(SUM(points), 0)")
+                .eq("user_id", userId));
+        if (objs == null || objs.isEmpty() || objs.get(0) == null) {
+            return 0;
+        }
+        return ((Number) objs.get(0)).intValue();
+    }
+
+    /**
      * 从 MySQL 加载排行榜数据（Redis 为空时的备用方案）
      */
     private List<RankingEntry> getRankingFromDb(int topN) {
-        List<Map<String, Object>> allPoints = checkInMapper.selectAllUserTotalPoints();
+        List<Map<String, Object>> allPoints = selectAllUserTotalPoints();
         if (allPoints.isEmpty()) return Collections.emptyList();
 
         // 取前 topN 条
@@ -98,11 +128,12 @@ public class RankingService {
                 .map(row -> ((Number) row.get("userId")).longValue())
                 .collect(Collectors.toList());
 
-        List<User> users = userMapper.selectByIds(userIds);
+        List<User> users = userMapper.selectBatchIds(userIds);
         Map<Long, User> userMap = users.stream()
                 .collect(Collectors.toMap(User::getId, u -> u));
 
-        List<UserAvatar> avatars = userAvatarMapper.selectByUserIds(userIds);
+        List<UserAvatar> avatars = userAvatarMapper.selectList(Wrappers.<UserAvatar>lambdaQuery()
+                .in(UserAvatar::getUserId, userIds));
         Map<Long, String> avatarMap = avatars.stream()
                 .collect(Collectors.toMap(UserAvatar::getUserId, UserAvatar::getFilePath));
 
@@ -132,7 +163,7 @@ public class RankingService {
         StringRedisTemplate redis = getRedis();
         if (redis == null) return;
 
-        Integer totalPoints = checkInMapper.selectTotalPoints(userId);
+        Integer totalPoints = selectTotalPoints(userId);
         int points = totalPoints != null ? totalPoints : 0;
         try {
             redis.opsForZSet().add(RANKING_KEY, String.valueOf(userId), points);
@@ -172,11 +203,12 @@ public class RankingService {
                 .map(Long::valueOf)
                 .collect(Collectors.toList());
 
-        List<User> users = userMapper.selectByIds(userIds);
+        List<User> users = userMapper.selectBatchIds(userIds);
         Map<Long, User> userMap = users.stream()
                 .collect(Collectors.toMap(User::getId, u -> u));
 
-        List<UserAvatar> avatars = userAvatarMapper.selectByUserIds(userIds);
+        List<UserAvatar> avatars = userAvatarMapper.selectList(Wrappers.<UserAvatar>lambdaQuery()
+                .in(UserAvatar::getUserId, userIds));
         Map<Long, String> avatarMap = avatars.stream()
                 .collect(Collectors.toMap(UserAvatar::getUserId, UserAvatar::getFilePath));
 
@@ -224,7 +256,9 @@ public class RankingService {
         User user = userMapper.selectById(userId);
         String nickname = user != null ? user.getNickname() : "未知用户";
 
-        UserAvatar avatar = userAvatarMapper.selectByUserId(userId);
+        UserAvatar avatar = userAvatarMapper.selectOne(Wrappers.<UserAvatar>lambdaQuery()
+                .eq(UserAvatar::getUserId, userId)
+                .last("LIMIT 1"));
         String avatarUrl = avatar != null ? avatar.getFilePath() : null;
 
         return new RankingEntry(

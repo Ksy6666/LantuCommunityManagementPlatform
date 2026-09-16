@@ -1,12 +1,18 @@
 package com.example.lantu_web_java.entity;
 
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+
 import java.time.LocalDateTime;
 
 /**
  * 技术讨论点赞记录（库：lantu_web_dsn.post_likes）
  */
+@TableName("lantu_web_dsn.post_likes")
 public class PostLike {
 
+    @TableId(type = IdType.AUTO)
     private Long id;
 
     private Long postId;

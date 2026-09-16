@@ -3,6 +3,7 @@ package com.example.lantu_web_java.service;
 import com.example.lantu_web_java.dto.LoginRequest;
 import com.example.lantu_web_java.dto.RegisterRequest;
 import com.example.lantu_web_java.entity.User;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.example.lantu_web_java.mapper.UserMapper;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -41,7 +42,7 @@ public class UserService {
             long num = random.nextLong(10000000000L, 100000000000L);
             account = String.valueOf(num);
             maxAttempts--;
-        } while (userMapper.countByAccount(account) > 0 && maxAttempts > 0);
+        } while (userMapper.selectCount(Wrappers.<User>lambdaQuery().eq(User::getAccount, account)) > 0 && maxAttempts > 0);
 
         if (maxAttempts <= 0) {
             throw new RuntimeException("账号生成失败，请稍后重试");
@@ -57,13 +58,13 @@ public class UserService {
                 ? phone.substring(phone.length() - 4)
                 : phone;
         String base = "用户" + suffix;
-        if (userMapper.countByNickname(base) == 0) {
+        if (userMapper.selectCount(Wrappers.<User>lambdaQuery().eq(User::getNickname, base)) == 0) {
             return base;
         }
         ThreadLocalRandom random = ThreadLocalRandom.current();
         for (int i = 0; i < 50; i++) {
             String candidate = base + random.nextInt(100, 999);
-            if (userMapper.countByNickname(candidate) == 0) {
+            if (userMapper.selectCount(Wrappers.<User>lambdaQuery().eq(User::getNickname, candidate)) == 0) {
                 return candidate;
             }
         }
@@ -90,11 +91,11 @@ public class UserService {
      */
     @Transactional(rollbackFor = Exception.class)
     public User register(RegisterRequest request) {
-        if (userMapper.countByPhone(request.getPhone()) > 0) {
+        if (userMapper.selectCount(Wrappers.<User>lambdaQuery().eq(User::getPhone, request.getPhone())) > 0) {
             throw new RuntimeException("该手机号已注册");
         }
         if (request.getEmail() != null && !request.getEmail().isBlank()
-                && userMapper.countByEmail(request.getEmail()) > 0) {
+                && userMapper.selectCount(Wrappers.<User>lambdaQuery().eq(User::getEmail, request.getEmail())) > 0) {
             throw new RuntimeException("该邮箱已被注册");
         }
 
@@ -105,7 +106,7 @@ public class UserService {
         String nickname = request.getNickname();
         if (nickname == null || nickname.isBlank()) {
             nickname = generateUniqueNickname(request.getPhone());
-        } else if (userMapper.countByNickname(nickname) > 0) {
+        } else if (userMapper.selectCount(Wrappers.<User>lambdaQuery().eq(User::getNickname, nickname)) > 0) {
             throw new RuntimeException("该昵称已被使用");
         }
 
@@ -137,8 +138,18 @@ public class UserService {
      * 用户登录（手机号 / 账号 + 密码）
      */
     public User login(LoginRequest request) {
-        User user = Optional.ofNullable(userMapper.selectByPhoneOrAccount(request.getAccount()))
-                .orElseThrow(() -> new RuntimeException("账号或密码错误"));
+        // 优先按 account 精确匹配，其次按 phone 精确匹配（等价旧 SQL 的 ORDER BY CASE WHEN 逻辑）
+        User user = userMapper.selectOne(Wrappers.<User>lambdaQuery()
+                .eq(User::getAccount, request.getAccount())
+                .last("LIMIT 1"));
+        if (user == null) {
+            user = userMapper.selectOne(Wrappers.<User>lambdaQuery()
+                    .eq(User::getPhone, request.getAccount())
+                    .last("LIMIT 1"));
+        }
+        if (user == null) {
+            throw new RuntimeException("账号或密码错误");
+        }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new RuntimeException("账号或密码错误");
@@ -160,7 +171,10 @@ public class UserService {
      */
     public User updateBirthday(Long userId, LocalDate birthday) {
         User user = findById(userId);
-        userMapper.updateBirthday(userId, birthday);
+        userMapper.update(null, Wrappers.<User>lambdaUpdate()
+                .set(User::getBirthday, birthday)
+                .set(User::getUpdatedAt, LocalDateTime.now())
+                .eq(User::getId, userId));
         user.setBirthday(birthday);
         return user;
     }
@@ -174,7 +188,10 @@ public class UserService {
             throw new RuntimeException("原密码错误");
         }
         String encodedPwd = passwordEncoder.encode(newPassword);
-        userMapper.updatePassword(userId, encodedPwd);
+        userMapper.update(null, Wrappers.<User>lambdaUpdate()
+                .set(User::getPassword, encodedPwd)
+                .set(User::getUpdatedAt, LocalDateTime.now())
+                .eq(User::getId, userId));
         user.setPassword(encodedPwd);
         return user;
     }
@@ -185,10 +202,12 @@ public class UserService {
     @Transactional(rollbackFor = Exception.class)
     public User updateProfile(Long userId, String name, String nickname, String phone, LocalDate birthday, String email) {
         User user = findById(userId);
-        if (email != null && !email.equals(user.getEmail()) && userMapper.countByEmail(email) > 0) {
+        if (email != null && !email.equals(user.getEmail())
+                && userMapper.selectCount(Wrappers.<User>lambdaQuery().eq(User::getEmail, email)) > 0) {
             throw new RuntimeException("该邮箱已被其他账号绑定");
         }
-        if (nickname != null && !nickname.equals(user.getNickname()) && userMapper.countByNickname(nickname) > 0) {
+        if (nickname != null && !nickname.equals(user.getNickname())
+                && userMapper.selectCount(Wrappers.<User>lambdaQuery().eq(User::getNickname, nickname)) > 0) {
             throw new RuntimeException("该昵称已被使用");
         }
         if (name != null) user.setName(name);
@@ -198,7 +217,8 @@ public class UserService {
         if (email != null) user.setEmail(email);
 
         try {
-            userMapper.updateProfile(user);
+            user.setUpdatedAt(LocalDateTime.now());
+            userMapper.updateById(user);
         } catch (RuntimeException e) {
             if (isDuplicateEntry(e, "nickname")) {
                 throw new RuntimeException("该昵称已被使用");
@@ -212,7 +232,7 @@ public class UserService {
      * 发送邮箱验证码（模拟：默认验证码为 1234）
      */
     public void sendVerificationCode(String email) {
-        User user = Optional.ofNullable(userMapper.selectByEmail(email))
+        User user = Optional.ofNullable(userMapper.selectOne(Wrappers.<User>lambdaQuery().eq(User::getEmail, email)))
                 .orElseThrow(() -> new RuntimeException("该邮箱未绑定账号"));
         // 模拟发送，验证码固定为 1234
         verificationCodes.put(email, "1234");
@@ -222,10 +242,13 @@ public class UserService {
      * 通过邮箱验证码修改密码（验证码由前端校验，后端直接执行更新）
      */
     public User changePasswordByEmail(String email, String newPassword) {
-        User user = Optional.ofNullable(userMapper.selectByEmail(email))
+        User user = Optional.ofNullable(userMapper.selectOne(Wrappers.<User>lambdaQuery().eq(User::getEmail, email)))
                 .orElseThrow(() -> new RuntimeException("该邮箱未绑定账号"));
         String encodedPwd = passwordEncoder.encode(newPassword);
-        userMapper.updatePassword(user.getId(), encodedPwd);
+        userMapper.update(null, Wrappers.<User>lambdaUpdate()
+                .set(User::getPassword, encodedPwd)
+                .set(User::getUpdatedAt, LocalDateTime.now())
+                .eq(User::getId, user.getId()));
         user.setPassword(encodedPwd);
         return user;
     }

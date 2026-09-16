@@ -1,5 +1,6 @@
 package com.example.lantu_web_java.controller;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.example.lantu_web_java.dto.ApiResponse;
 //import com.example.lantu_web_java.dto.*;
 import com.example.lantu_web_java.dto.ChangePasswordEmailRequest;
@@ -43,7 +44,7 @@ public class AuthController {
     private Map<Long, String> getRoleMap() {
         List<Role> roles;
         try {
-            roles = roleMapper.selectAll();
+            roles = roleMapper.selectList(Wrappers.<Role>lambdaQuery().orderByAsc(Role::getId));
         } catch (Exception e) {
             return Collections.emptyMap();
         }

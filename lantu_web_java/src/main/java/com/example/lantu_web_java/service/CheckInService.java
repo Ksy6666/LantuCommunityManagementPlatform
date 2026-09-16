@@ -1,5 +1,7 @@
 package com.example.lantu_web_java.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.example.lantu_web_java.entity.CheckIn;
 import com.example.lantu_web_java.mapper.CheckInMapper;
 import org.slf4j.Logger;
@@ -8,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -36,7 +39,10 @@ public class CheckInService {
         LocalDate today = LocalDate.now();
 
         // 检查是否已签到
-        CheckIn existing = checkInMapper.selectByUserIdAndDate(userId, today);
+        CheckIn existing = checkInMapper.selectOne(Wrappers.<CheckIn>lambdaQuery()
+                .eq(CheckIn::getUserId, userId)
+                .eq(CheckIn::getCheckInDate, today)
+                .last("LIMIT 1"));
         if (existing != null) {
             throw new RuntimeException("今日已签到，请明天再来");
         }
@@ -63,8 +69,9 @@ public class CheckInService {
             }
         }
 
-        // 创建签到记录
+        // 创建签到记录（原 XML insert 用 NOW() 写 created_at，改为继承 insert 前在 Java 侧设置）
         CheckIn checkIn = new CheckIn(userId, today, points);
+        checkIn.setCreatedAt(LocalDateTime.now());
         checkInMapper.insert(checkIn);
 
         // 同步积分到 Redis 排行榜 ZSET（失败不影响签到）
@@ -75,7 +82,7 @@ public class CheckInService {
         }
 
         // 从 check_ins 表 SUM 计算总积分
-        Integer totalPoints = checkInMapper.selectTotalPoints(userId);
+        Integer totalPoints = selectTotalPoints(userId);
         int newConsecutiveDays = consecutiveDays + 1;
 
         Map<String, Object> result = new HashMap<>();
@@ -95,18 +102,24 @@ public class CheckInService {
         LocalDate today = LocalDate.now();
         String yearMonth = today.format(DateTimeFormatter.ofPattern("yyyy-MM"));
 
-        // 当月签到记录
-        List<CheckIn> monthlyRecords = checkInMapper.selectByUserIdAndMonth(userId, yearMonth);
+        // 当月签到记录（等价旧 SQL：DATE_FORMAT(check_in_date,'%Y-%m')=#{yearMonth} ORDER BY check_in_date ASC）
+        List<CheckIn> monthlyRecords = checkInMapper.selectList(Wrappers.<CheckIn>lambdaQuery()
+                .eq(CheckIn::getUserId, userId)
+                .apply("DATE_FORMAT(check_in_date, '%Y-%m') = {0}", yearMonth)
+                .orderByAsc(CheckIn::getCheckInDate));
         List<String> checkInDates = monthlyRecords.stream()
                 .map(c -> c.getCheckInDate().toString())
                 .collect(Collectors.toList());
 
         // 总积分（从 check_ins 表 SUM 计算）
-        Integer totalPoints = checkInMapper.selectTotalPoints(userId);
+        Integer totalPoints = selectTotalPoints(userId);
 
         // 连续签到天数
         int consecutiveDays = getConsecutiveDays(userId, today);
-        boolean checkedInToday = checkInMapper.selectByUserIdAndDate(userId, today) != null;
+        boolean checkedInToday = checkInMapper.selectOne(Wrappers.<CheckIn>lambdaQuery()
+                .eq(CheckIn::getUserId, userId)
+                .eq(CheckIn::getCheckInDate, today)
+                .last("LIMIT 1")) != null;
         if (checkedInToday) {
             consecutiveDays++;
         }
@@ -129,7 +142,10 @@ public class CheckInService {
      * 获取当月每天的签到状态（用于日历显示）
      */
     public Map<String, Object> getMonthStatus(Long userId, String yearMonth) {
-        List<CheckIn> records = checkInMapper.selectByUserIdAndMonth(userId, yearMonth);
+        List<CheckIn> records = checkInMapper.selectList(Wrappers.<CheckIn>lambdaQuery()
+                .eq(CheckIn::getUserId, userId)
+                .apply("DATE_FORMAT(check_in_date, '%Y-%m') = {0}", yearMonth)
+                .orderByAsc(CheckIn::getCheckInDate));
         List<String> checkInDates = records.stream()
                 .map(c -> c.getCheckInDate().toString())
                 .collect(Collectors.toList());
@@ -146,8 +162,11 @@ public class CheckInService {
      * 计算连续签到天数（不含今天）
      */
     private int getConsecutiveDays(Long userId, LocalDate today) {
-        // 取最近 60 条记录以足够计算连续天数
-        List<CheckIn> recentList = checkInMapper.selectRecentByUserId(userId, 60);
+        // 取最近 60 条记录以足够计算连续天数（等价旧 SQL：ORDER BY check_in_date DESC LIMIT #{limit}）
+        List<CheckIn> recentList = checkInMapper.selectList(Wrappers.<CheckIn>lambdaQuery()
+                .eq(CheckIn::getUserId, userId)
+                .orderByDesc(CheckIn::getCheckInDate)
+                .last("LIMIT 60"));
 
         if (recentList.isEmpty()) {
             return 0;
@@ -167,5 +186,18 @@ public class CheckInService {
         }
 
         return count;
+    }
+
+    /**
+     * 计算用户总积分（等价旧 SQL：SELECT COALESCE(SUM(points), 0) FROM check_ins WHERE user_id = ?）
+     */
+    private Integer selectTotalPoints(Long userId) {
+        List<Object> objs = checkInMapper.selectObjs(new QueryWrapper<CheckIn>()
+                .select("COALESCE(SUM(points), 0)")
+                .eq("user_id", userId));
+        if (objs == null || objs.isEmpty() || objs.get(0) == null) {
+            return 0;
+        }
+        return ((Number) objs.get(0)).intValue();
     }
 }

@@ -1,6 +1,9 @@
 package com.example.lantu_web_java.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.example.lantu_web_java.dto.ApiResponse;
+import com.example.lantu_web_java.entity.CheckIn;
 import com.example.lantu_web_java.entity.Role;
 import com.example.lantu_web_java.entity.User;
 import com.example.lantu_web_java.mapper.CheckInMapper;
@@ -12,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -41,7 +45,7 @@ public class AdminController {
     private Map<Long, String> getRoleMap() {
         List<Role> roles;
         try {
-            roles = roleMapper.selectAll();
+            roles = roleMapper.selectList(Wrappers.<Role>lambdaQuery().orderByAsc(Role::getId));
         } catch (Exception e) {
             return Collections.emptyMap();
         }
@@ -59,10 +63,12 @@ public class AdminController {
                     .body(ApiResponse.error(403, "无管理员权限"));
         }
 
-        int totalUsers = userMapper.countTotalUsers();
-        int todayCheckins = checkInMapper.countTodayCheckIns();
+        int totalUsers = userMapper.selectCount(null).intValue();
+        int todayCheckins = checkInMapper.selectCount(Wrappers.<CheckIn>lambdaQuery()
+                .eq(CheckIn::getCheckInDate, LocalDate.now())).intValue();
         String thisMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
-        int monthCheckins = checkInMapper.countThisMonthCheckIns(thisMonth);
+        int monthCheckins = checkInMapper.selectCount(new QueryWrapper<CheckIn>()
+                .apply("DATE_FORMAT(check_in_date, '%Y-%m') = {0}", thisMonth)).intValue();
 
         Map<String, Object> stats = new LinkedHashMap<>();
         stats.put("totalUsers", totalUsers);
@@ -92,8 +98,12 @@ public class AdminController {
         if (size > 100) size = 100;
         int offset = (page - 1) * size;
 
-        List<User> users = userMapper.selectAllUsers(keyword, offset, size);
-        int total = keyword.isEmpty() ? userMapper.countTotalUsers() : userMapper.countAllUsers(keyword);
+        // 等价旧 SQL：keyword 匹配 account/nickname/name/phone，ORDER BY id DESC，LIMIT size OFFSET offset
+        QueryWrapper<User> wrapper = buildKeywordWrapper(keyword)
+                .orderByDesc("id")
+                .last("LIMIT " + size + " OFFSET " + offset);
+        List<User> users = userMapper.selectList(wrapper);
+        int total = keyword.isEmpty() ? userMapper.selectCount(null).intValue() : userMapper.selectCount(buildKeywordWrapper(keyword)).intValue();
         Map<Long, String> roleMap = getRoleMap();
 
         // 为每个用户填充 roleName
@@ -191,7 +201,10 @@ public class AdminController {
                     .body(ApiResponse.error(400, "角色不存在"));
         }
 
-        userMapper.updateRole(id, roleId);
+        userMapper.update(null, Wrappers.<User>lambdaUpdate()
+                .set(User::getRoleId, roleId)
+                .set(User::getUpdatedAt, LocalDateTime.now())
+                .eq(User::getId, id));
         // 清除 Redis 排行榜缓存（角色变化不影响积分，但刷新用户信息用）
         return ResponseEntity.ok(ApiResponse.success("角色已更新", Map.of("roleName", role.getRoleName())));
     }
@@ -223,5 +236,19 @@ public class AdminController {
 
         userMapper.deleteById(id);
         return ResponseEntity.ok(ApiResponse.success("用户已删除", Map.of()));
+    }
+
+    /**
+     * 构建关键词搜索条件（等价旧 XML selectAllUsers/countAllUsers 的 OR 条件）
+     */
+    private QueryWrapper<User> buildKeywordWrapper(String keyword) {
+        QueryWrapper<User> wrapper = new QueryWrapper<>();
+        if (keyword != null && !keyword.isEmpty()) {
+            wrapper.and(w -> w.like("account", keyword)
+                    .or().like("nickname", keyword)
+                    .or().like("name", keyword)
+                    .or().like("phone", keyword));
+        }
+        return wrapper;
     }
 }

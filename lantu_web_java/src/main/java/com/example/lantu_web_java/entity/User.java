@@ -1,9 +1,16 @@
 package com.example.lantu_web_java.entity;
 
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+@TableName("users")
 public class User {
+    @TableId(type = IdType.AUTO)
     private Long id;
     private String account;
     private String password;
@@ -13,6 +20,8 @@ public class User {
     private String email;
     private LocalDate birthday;
     private Long roleId;
+    /** 角色名称（关联 roles 表，非表字段） */
+    @TableField(exist = false)
     private String roleName;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

@@ -1,4 +1,4 @@
-# Open_Lantu 官网（团队制作小型毕设）
+# Open_Lantu 官网
 覆盖范围（springboot+vue3+typescript+mybatis+Redis）
 ---
 
@@ -480,7 +480,7 @@ spring:
 
 ---
 
-## 团队约定
+## 开发者规定
 
 - 页面组件放 `src/views/`，公共组件放 `src/components/`
 - 页面使用 `<script setup lang="ts">` 写法

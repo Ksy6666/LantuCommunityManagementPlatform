@@ -494,3 +494,5 @@ spring:
 - 前端登录态使用 `sessionStorage` 存储（关标签页即退出），非 `localStorage`
 - 角色权限通过 `role_id` 字段控制，管理后台仅管理员可访问
 - 排行榜优先使用 Redis ZSET，Redis 不可用时自动回退 MySQL 查询
+
+感谢观看。
